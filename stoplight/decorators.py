@@ -100,6 +100,7 @@ def validation_function(func):
             if not empty_ok and value == '':
                 msg = 'Empty value not permitted'
                 raise ValidationFailed(msg)
+
             func(value)
         return wrapper
     return inner
