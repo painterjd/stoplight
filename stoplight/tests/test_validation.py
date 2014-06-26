@@ -41,13 +41,14 @@ class DummyResponse(object):
 
 @validation_function
 def is_request(candidate):
-    import pdb; pdb.set_trace()
-    return isinstance(candidate, DummyRequest)
+    if not isinstance(candidate, DummyRequest):
+        raise ValidationFailed('Input must be a request')
 
 
 @validation_function
 def is_response(candidate):
-    return isinstance(candidate, DummyResponse)
+    if not isinstance(candidate, DummyResponse):
+        raise ValidationFailed('Input must be a response')
 
 
 class DummyEndpoint(object):
@@ -86,10 +87,9 @@ class DummyEndpoint(object):
     @validate(
         request=Rule(is_request(), lambda: abort(404)),
         response=Rule(is_response(), lambda: abort(404)),
-        value=Rule(is_upper(), lambda: abort(404)),
-        header1=Rule(is_upper(), lambda: abort(404))
+        value=Rule(is_upper(), lambda: abort(404))
     )
-    def get_falcon_style(self, request, response, value, header1):
+    def get_falcon_style(self, request, response, value):
         return value
 
 
@@ -123,13 +123,22 @@ class TestValidationDecorator(TestCase):
         request = DummyRequest()
         response = DummyResponse()
 
+        # Try to call with missing params. The validation
+        # function should never get called
         oldcount = error_count
-
-        # Missing required parameters. This should
-        # call the error function
         self.ep.get_falcon_style(response, 'HELLO')
+        self.assertEqual(oldcount + 1, error_count)
 
-        self.assertEqual(oldcount+1, error_count)
+        # Try to pass a string to a positional argument
+        # where a response is expected
+        oldcount = error_count
+        self.ep.get_falcon_style(request, "bogusinput", 'HELLO')
+        self.assertEqual(oldcount + 1, error_count)
+
+        # Happy path
+        oldcount = error_count
+        self.ep.get_falcon_style(request, response, 'HELLO')
+        self.assertEqual(oldcount, error_count)
 
     def test_happy_path_and_validation_failure(self):
         global error_count
