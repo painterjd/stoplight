@@ -41,6 +41,7 @@ class DummyResponse(object):
 
 @validation_function
 def is_request(candidate):
+    import pdb; pdb.set_trace()
     return isinstance(candidate, DummyRequest)
 
 
@@ -116,6 +117,7 @@ class TestValidationDecorator(TestCase):
             self.ep.get_value_programming_error('AT_ME')
 
     def test_falcon_style(self):
+
         global error_count
 
         request = DummyRequest()
@@ -123,9 +125,11 @@ class TestValidationDecorator(TestCase):
 
         oldcount = error_count
 
+        # Missing required parameters. This should
+        # call the error function
         self.ep.get_falcon_style(response, 'HELLO')
 
-        self.assertEqual(oldcount, error_count)
+        self.assertEqual(oldcount+1, error_count)
 
     def test_happy_path_and_validation_failure(self):
         global error_count
