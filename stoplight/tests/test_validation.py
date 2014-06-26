@@ -135,6 +135,28 @@ class TestValidationDecorator(TestCase):
         self.ep.get_falcon_style(request, "bogusinput", 'HELLO')
         self.assertEqual(oldcount + 1, error_count)
 
+        # Pass in as kwvalues with good input but out of
+        # typical order (should succeed)
+        oldcount = error_count
+        self.ep.get_falcon_style(response=response, value='HELLO',
+            request=request)
+        self.assertEqual(oldcount, error_count)
+
+        # Pass in as kwvalues with good input but out of
+        # typical order with an invalid value (lower-case 'h')
+        oldcount = error_count
+        self.ep.get_falcon_style(response=response, value='hELLO',
+            request=request)
+        self.assertEqual(oldcount + 1, error_count)
+
+        # Pass in as kwvalues with good input but out of typical order
+        # and pass an invalid value. Note that here the response is
+        # assigned to request, etc.
+        oldcount = error_count
+        self.ep.get_falcon_style(response=request, value='HELLO',
+            request=response)
+        self.assertEqual(oldcount + 1, error_count)
+
         # Happy path
         oldcount = error_count
         self.ep.get_falcon_style(request, response, 'HELLO')
