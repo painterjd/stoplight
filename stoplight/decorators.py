@@ -101,6 +101,6 @@ def validation_function(func):
                 msg = 'Empty value not permitted'
                 raise ValidationFailed(msg)
 
-            func(value)
+            func(value, **kwargs)
         return wrapper
     return inner
