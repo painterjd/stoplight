@@ -1,9 +1,9 @@
+import os
 from unittest import TestCase
 
 from stoplight import *
 from stoplight.exceptions import *
-
-import os
+from stoplight import helpers
 
 # TODO: We probably want to move this to a
 # test helpers library
@@ -257,3 +257,5 @@ class TestValidationDecorator(TestCase):
         other_vals['value2'] = ''
         res = self.ep.get_value_with_getter('TEST')
         self.assertEqual('TEST', res)
+
+# TODO: Add pecan test case

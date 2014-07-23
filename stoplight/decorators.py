@@ -42,7 +42,6 @@ def validate(**rules):
             param_values.update(kwargs)
 
             for param, rule in rules.items():
-
                 # Where can we get the value? It's either
                 # the getter on the rule or we default
                 # to verifying parameters.
@@ -101,6 +100,6 @@ def validation_function(func):
                 msg = 'Empty value not permitted'
                 raise ValidationFailed(msg)
 
-            func(value)
+            func(value, **kwargs)
         return wrapper
     return inner
