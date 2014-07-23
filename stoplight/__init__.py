@@ -42,7 +42,3 @@ controller class...."""
 from .rule import Rule, ValidationRule
 from .exceptions import ValidationFailed, ValidationProgrammingError
 from .decorators import validate, validation_function
-
-__all__ = ['Rule', 'ValidationRule', 'ValidationFailed',
-           'ValidationProgrammingError',
-           'validate', 'validation_function']
