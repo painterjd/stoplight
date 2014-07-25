@@ -42,7 +42,7 @@ class DummyPecanEndpoint(object):
     @pecan.expose()
     @decorators.validate(
         request=rule.Rule(is_valid_json(),
-                          lambda: pecan.abort(400),
+                          lambda error_info: pecan.abort(400),
                           helpers.pecan_getter)
     )
     def index(self):

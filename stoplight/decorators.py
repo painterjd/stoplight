@@ -70,7 +70,7 @@ def validate(**rules):
                         outargs[param] = value
 
                 except ValidationFailed as ex:
-                    rule.errfunc()
+                    rule.errfunc(error_info=ex)
                     return
 
             assert funcparams.args[0] == 'self'
@@ -100,6 +100,6 @@ def validation_function(func):
                 msg = 'Empty value not permitted'
                 raise ValidationFailed(msg)
 
-            func(value, **kwargs)
+            func(value)
         return wrapper
     return inner
