@@ -42,7 +42,6 @@ def validate(**rules):
             param_values.update(kwargs)
 
             for param, rule in rules.items():
-
                 # Where can we get the value? It's either
                 # the getter on the rule or we default
                 # to verifying parameters.
@@ -71,7 +70,7 @@ def validate(**rules):
                         outargs[param] = value
 
                 except ValidationFailed as ex:
-                    rule.errfunc()
+                    rule.errfunc(error_info=ex)
                     return
 
             assert funcparams.args[0] == 'self'

@@ -1,9 +1,9 @@
+import os
 from unittest import TestCase
 
 from stoplight import *
 from stoplight.exceptions import *
-
-import os
+from stoplight import helpers
 
 # TODO: We probably want to move this to a
 # test helpers library
@@ -51,9 +51,9 @@ def is_response(candidate):
         raise ValidationFailed('Input must be a response')
 
 
-RequestRule = Rule(is_request(), lambda: abort(404))
-ResponseRule = Rule(is_response(), lambda: abort(404))
-UppercaseRule = Rule(is_upper(), lambda: abort(404))
+RequestRule = Rule(is_request(), lambda error_info: abort(404))
+ResponseRule = Rule(is_response(), lambda error_info: abort(404))
+UppercaseRule = Rule(is_upper(), lambda error_info: abort(404))
 
 
 class DummyEndpoint(object):
@@ -64,7 +64,8 @@ class DummyEndpoint(object):
 
     # Note: the lambda in this function can never actually be
     # called, so we use no cover here
-    @validate(value=Rule(is_upper, lambda: abort(404)))  # pragma: no cover
+    @validate(value=Rule(is_upper,
+                         lambda error_info: abort(404)))  # pragma: no cover
     def get_value_programming_error(self, value):
         # This function body should never be
         # callable since the validation error
@@ -72,16 +73,16 @@ class DummyEndpoint(object):
         assert False  # pragma: no cover
 
     @validate(
-        value1=Rule(is_upper(), lambda: abort(404)),
-        value2=Rule(is_upper(), lambda: abort(404)),
-        value3=Rule(is_upper(), lambda: abort(404))
+        value1=Rule(is_upper(), lambda error_info: abort(404)),
+        value2=Rule(is_upper(), lambda error_info: abort(404)),
+        value3=Rule(is_upper(), lambda error_info: abort(404))
     )  # pragma: no cover
     def get_value_happy_path(self, value1, value2, value3):
         return value1 + value2 + value3
 
     @validate(
         value1=Rule(is_upper(), lambda: abort(404)),
-        value2=Rule(is_upper(empty_ok=True), lambda: abort(404),
+        value2=Rule(is_upper(empty_ok=True), lambda error_info: abort(404),
             get_other_val),
     )  # pragma: no cover
     def get_value_with_getter(self, value1):
@@ -90,9 +91,9 @@ class DummyEndpoint(object):
 
     # Falcon-style endpoint
     @validate(
-        request=Rule(is_request(), lambda: abort(404)),
-        response=Rule(is_response(), lambda: abort(404)),
-        value=Rule(is_upper(), lambda: abort(404))
+        request=Rule(is_request(), lambda error_info: abort(404)),
+        response=Rule(is_response(), lambda error_info: abort(404)),
+        value=Rule(is_upper(), lambda error_info: abort(404))
     )
     def get_falcon_style(self, request, response, value):
         return value
@@ -257,3 +258,5 @@ class TestValidationDecorator(TestCase):
         other_vals['value2'] = ''
         res = self.ep.get_value_with_getter('TEST')
         self.assertEqual('TEST', res)
+
+# TODO: Add pecan test case
