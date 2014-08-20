@@ -10,4 +10,4 @@ env:
 script: tox -e $TOX_ENV
 notifications:
   email:
-    - jamie@jpainter.org
+    - accts@jpainter.org
