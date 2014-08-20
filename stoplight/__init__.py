@@ -5,7 +5,7 @@ Problem Statement:
 Every good programmer should know that input validation is the first and
 best step at implementing application-level security for your product.
 Unvalidated user input leads to issues such as SQL injection, javascript
-inject and cross-site scripting attacks, etc.
+injection and cross-site scripting attacks, etc.
 
 More and more applications are being written for python. Unfortunately,
 not many frameworks provide for reasonable input validation techniques
