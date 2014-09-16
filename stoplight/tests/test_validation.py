@@ -1,12 +1,10 @@
 from unittest import TestCase
 
+import stoplight
 from stoplight import *
 from stoplight.exceptions import *
 
 import os
-
-# TODO: We probably want to move this to a
-# test helpers library
 
 VALIDATED_STR = 'validated'
 
@@ -17,7 +15,31 @@ def is_upper(z):
     that ensures that input is all caps
     """
     if z.upper() != z:
-        raise ValidationFailed('{0} no uppercase'.format(z))
+        raise ValidationFailed('{0} is not uppercase'.format(z))
+
+
+@validation_function
+def is_json(candidate):
+    import json
+    try:
+        # Note: this is an example only and probably not
+        # a good idea to use this in production. Use
+        # a real json validation framework
+        json.loads(candidate)
+    except ValueError:
+        raise ValidationFailed('Input must be valid json')
+
+
+def is_type(t):
+    @validation_function
+    def func(value):
+        # Make sure the user actually passed us a type
+        if not isinstance(t, type):
+            raise TypeError('Type of "type" is required')
+
+        if not isinstance(value, t):
+            raise ValidationFailed('Input is incorrect type')
+    return func
 
 error_count = 0
 
@@ -31,8 +53,14 @@ get_other_val = other_vals.get
 
 
 class DummyRequest(object):
+
     def __init__(self):
-        self.headers = dict(header1='headervalue1')
+        self.headers = {
+            'header1': 'headervalue1',
+            'X-Position': '32'
+        }
+
+        self.body = ""
 
 
 class DummyResponse(object):
@@ -51,9 +79,47 @@ def is_response(candidate):
         raise ValidationFailed('Input must be a response')
 
 
-RequestRule = Rule(is_request(), lambda: abort(404))
 ResponseRule = Rule(is_response(), lambda: abort(404))
 UppercaseRule = Rule(is_upper(), lambda: abort(404))
+
+
+class RequestRule(Rule):
+
+    def __init__(self, *nested_rules):
+        """Constructs a new Rule for validating requests. Any
+        nested rules needed for validating parts of the request
+        (such as headers, query string params, etc) should
+        also be passed in.
+
+        :param nested_rules: Any sub rules that also should be
+          used for validation
+        """
+        # If we get something that's not a request here,
+        # something bad happened in the server (i.e.
+        # maybe a programming error), so return a 500
+        Rule.__init__(self, vfunc=is_request(),
+                      errfunc=lambda: abort(500),
+                      nested_rules=list(nested_rules))
+
+
+class HeaderRule(Rule):
+
+    def __init__(self, headername, vfunc, errfunc):
+        getter = lambda r: r.headers.get(headername)
+        Rule.__init__(self, vfunc=vfunc, getter=getter, errfunc=errfunc)
+
+
+class BodyRule(Rule):
+
+    def __init__(self, vfunc, errfunc):
+        getter = lambda req: req.body
+        Rule.__init__(self, vfunc=vfunc, getter=getter, errfunc=errfunc)
+
+
+PositionRule = HeaderRule("X-Position", is_type(str)(), lambda: abort(404))
+JsonBodyRule = BodyRule(is_json(empty_ok=True), lambda: abort(404))
+PositionRuleProgError = HeaderRule(
+    "X-Position", is_type(str), lambda: abort(404))
 
 
 class DummyEndpoint(object):
@@ -82,7 +148,7 @@ class DummyEndpoint(object):
     @validate(
         value1=Rule(is_upper(), lambda: abort(404)),
         value2=Rule(is_upper(empty_ok=True), lambda: abort(404),
-            get_other_val),
+                    get_other_val),
     )  # pragma: no cover
     def get_value_with_getter(self, value1):
         global other_vals
@@ -98,9 +164,29 @@ class DummyEndpoint(object):
         return value
 
     # Falcon-style w/ delcared rules
-    @validate(request=RequestRule, response=ResponseRule,
-        value=UppercaseRule)
+    @validate(request=RequestRule(), response=ResponseRule,
+              value=UppercaseRule)
     def get_falcon_style2(self, request, response, value):
+        return value
+
+    # Stoplight allows the user to express rules, alias them,
+    # then clearly know what is being validated.
+    @validate(
+        request=RequestRule(PositionRule, JsonBodyRule),
+        response=ResponseRule,
+        value=Rule(is_type(int)(), lambda: abort(400))
+    )
+    def do_something(self, request, response, value):
+        return value
+
+    # Use a position rule that has a programming error.
+    # This should throw
+    @validate(
+        request=RequestRule(PositionRuleProgError, JsonBodyRule),
+        response=ResponseRule,
+        value=Rule(is_type(int)(), lambda: abort(400))
+    )
+    def do_something_programming_error(self, request, response, value):
         return value
 
 
@@ -127,6 +213,86 @@ class TestValidationDecorator(TestCase):
         with self.assertRaises(ValidationProgrammingError):
             self.ep.get_value_programming_error('AT_ME')
 
+    def test_callbacks(self):
+
+        global error_count
+
+        request = DummyRequest()
+        response = DummyResponse()
+
+        # Let's register a bad callback that throws. This is to ensure
+        # that doing so would not prevent other callbacks from
+        # happening
+
+        def bad_cb(x):
+            raise Exception("Bad callback")
+
+        stoplight.register_callback(bad_cb)
+
+        valfailures = []
+
+        # Force an error. X-Position is required
+        # to be a string type, so passing an int
+        # should force a validation error
+        request.headers = {'X-Position': 9876}
+
+        oldcount = error_count
+        self.ep.do_something(request, response, 3)
+        self.assertEqual(oldcount + 1, error_count)
+
+        # Our callback wasn't registered, so this should
+        # have resulted no change to response_obj
+        self.assertEqual(len(valfailures), 0)
+
+        cb = lambda x: valfailures.append(x)
+
+        # Now register a callback and try again
+        stoplight.register_callback(cb)
+
+        oldcount = error_count
+        self.ep.do_something(request, response, 3)
+        self.assertEqual(oldcount + 1, error_count)
+
+        self.assertEqual(len(valfailures), 1)
+
+        # Try again, should increment the count again
+        oldcount = error_count
+        self.ep.do_something(request, response, 3)
+        self.assertEqual(oldcount + 1, error_count)
+
+        self.assertEqual(len(valfailures), 2)
+        stoplight.unregister_callback(cb)
+        stoplight.unregister_callback(bad_cb)
+
+        # removing a bogus callback should fail silently
+        stoplight.unregister_callback(lambda x: None)
+
+        # Now, let's get the second item and do some
+        # validations on it
+        obj = valfailures[1]
+
+        # Parameter-level stuff
+        self.assertIsInstance(obj.rule, RequestRule)
+        self.assertEqual(obj.function.__name__, 'do_something')
+        self.assertEqual(obj.parameter, 'request')
+        self.assertIsInstance(obj.parameter_value, DummyRequest)
+
+        # nested level stuff
+        self.assertIsInstance(obj.nested_rule, HeaderRule)
+        self.assertEqual(obj.nested_value, 9876)
+
+        # This is the exception that should have been thrown
+        self.assertIsInstance(obj.ex, ValidationFailed)
+
+        pretty = str(obj)
+
+        # Let's ensure that some basic information is in there
+        self.assertIn('RequestRule', pretty)
+        self.assertIn(obj.function.__name__, pretty)
+        self.assertIn(obj.parameter, pretty)
+        self.assertIn(str(obj.nested_value), pretty)
+        self.assertIn(str(obj.ex), pretty)
+
     def test_falcon_style(self):
 
         global error_count
@@ -150,14 +316,14 @@ class TestValidationDecorator(TestCase):
         # typical order (should succeed)
         oldcount = error_count
         self.ep.get_falcon_style(response=response, value='HELLO',
-            request=request)
+                                 request=request)
         self.assertEqual(oldcount, error_count)
 
         # Pass in as kwvalues with good input but out of
         # typical order with an invalid value (lower-case 'h')
         oldcount = error_count
         self.ep.get_falcon_style(response=response, value='hELLO',
-            request=request)
+                                 request=request)
         self.assertEqual(oldcount + 1, error_count)
 
         # Pass in as kwvalues with good input but out of typical order
@@ -165,12 +331,45 @@ class TestValidationDecorator(TestCase):
         # assigned to request, etc.
         oldcount = error_count
         self.ep.get_falcon_style(response=request, value='HELLO',
-            request=response)
+                                 request=response)
         self.assertEqual(oldcount + 1, error_count)
 
         # Happy path
         oldcount = error_count
         self.ep.get_falcon_style(request, response, 'HELLO')
+        self.assertEqual(oldcount, error_count)
+
+        # This should fail because 3 should be a str, not
+        # an int
+        oldcount = error_count
+        self.ep.do_something(request, response, '3')
+        self.assertEqual(oldcount + 1, error_count)
+
+        # This should now be successful
+        oldcount = error_count
+        self.ep.do_something(request, response, 3)
+        self.assertEqual(oldcount, error_count)
+
+        # Now change the request so that the body is
+        # something not considered valid json. This should
+        # cause a failure of the nested error
+        request.body = "{"
+        oldcount = error_count
+        self.ep.do_something(request, response, 3)
+        self.assertEqual(oldcount + 1, error_count)
+
+        # Switch request back to normal. Should succeed
+        request.body = ""
+        oldcount = error_count
+        self.ep.do_something(request, response, 3)
+        self.assertEqual(oldcount, error_count)
+
+        # Now try one with a programming erro
+        oldcount = error_count
+
+        with self.assertRaises(ValidationProgrammingError) as ctx:
+            self.ep.do_something_programming_error(request, response, 3)
+
         self.assertEqual(oldcount, error_count)
 
     def test_falcon_style_decld_rules(self):
@@ -200,14 +399,14 @@ class TestValidationDecorator(TestCase):
         # typical order (should succeed)
         oldcount = error_count
         self.ep.get_falcon_style2(response=response, value='HELLO',
-            request=request)
+                                  request=request)
         self.assertEqual(oldcount, error_count)
 
         # Pass in as kwvalues with good input but out of
         # typical order with an invalid value (lower-case 'h')
         oldcount = error_count
         self.ep.get_falcon_style2(response=response, value='hELLO',
-            request=request)
+                                  request=request)
         self.assertEqual(oldcount + 1, error_count)
 
         # Pass in as kwvalues with good input but out of typical order
@@ -215,7 +414,7 @@ class TestValidationDecorator(TestCase):
         # assigned to request, etc.
         oldcount = error_count
         self.ep.get_falcon_style2(response=request, value='HELLO',
-            request=response)
+                                  request=response)
         self.assertEqual(oldcount + 1, error_count)
 
         # Happy path

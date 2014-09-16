@@ -1,29 +1,13 @@
 
 import inspect
 from functools import wraps
+import stoplight
 from stoplight.exceptions import *
 from stoplight.rule import *
 
 
 def validate(**rules):
-    """Validation endpoint decorator
-
-    This decorator allows validation of input from user
-    API endpoints. This allows separation of business logic
-    and avoids convoluted validation logic.
-
-    Typical use is as follows:
-
-    @validate({'bird_id': val_bird_id(allow_none=True), 404)
-    def get_one(self, bird_id):
-        lookup_bird_data(bird_id)
-
-    In this example, bird_id will be passed to val_bird_id
-    and validated. If the validation function throws the
-    ValidationFailed exception, the specified code will be returned
-    in the response and the resultant function will never actually
-    be called.
-    """
+    """Validates a function's input using the specified set of rules."""
     def _validate(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -62,8 +46,43 @@ def validate(**rules):
                     resp = rule.vfunc(value)
 
                     if inspect.isfunction(resp):
-                        msg = 'Validation function returned a function.'
+                        msg = 'Val func returned a function. Rule={0}'
+                        msg = msg.format(rule.__class__.__name__)
+
                         raise ValidationProgrammingError(msg)
+
+                    # Now validate any nested rules that are part of this
+                    # request.
+                    for nested_rule in rule.nested_rules:
+                        # Note: for 'nested' rules, the value
+                        # passed into the getter is the value
+                        # of the 'super' parameter.
+                        nested_getter = nested_rule.getter
+                        nested_val = nested_getter(value)
+
+                        try:
+                            resp = nested_rule.vfunc(nested_val)  # throws
+                        except ValidationFailed as ex:
+
+                            nested_rule.errfunc()
+
+                            val_failure = stoplight.ValidationFailureInfo()
+                            val_failure.function = f
+                            val_failure.parameter = param
+                            val_failure.parameter_value = value
+                            val_failure.rule = rule
+                            val_failure.nested_rule = nested_rule
+                            val_failure.nested_value = nested_val
+                            val_failure.ex = ex
+
+                            stoplight.failure_dispach(val_failure)
+
+                            return
+
+                        if inspect.isfunction(resp):
+                            msg = 'Nest rule validation function ' + \
+                                'returned a function'
+                            raise ValidationProgrammingError(msg)
 
                     # If this is a param rule, add the
                     # param to the list of out args
@@ -72,6 +91,16 @@ def validate(**rules):
 
                 except ValidationFailed as ex:
                     rule.errfunc()
+
+                    val_failure = stoplight.ValidationFailureInfo()
+                    val_failure.function = f
+                    val_failure.parameter = param
+                    val_failure.parameter_value = value
+                    val_failure.rule = rule
+                    val_failure.ex = ex
+
+                    stoplight.failure_dispach(val_failure)
+
                     return
 
             assert funcparams.args[0] == 'self'

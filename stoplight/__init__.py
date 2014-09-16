@@ -1,7 +1,5 @@
 """Stoplight -- an input validation framework for Python
 
-Problem Statement:
-
 Every good programmer should know that input validation is the first and
 best step at implementing application-level security for your product.
 Unvalidated user input leads to issues such as SQL injection, javascript
@@ -20,9 +18,157 @@ is greatly increased.
 
 A very common programming paradigm for wsgi-based applications is for
 applications to expose RESTful endpoints as method members of a
-controller class...."""
+controller class. Typical input validation results in logic built-in
+to each function. This makes validating the input very tedious.
 
-# Hoist everything up into the stopwatch namespace
+Stoplight aims to provide a nice, convenient and flexible way to
+validate user input using a simple decorator.
+"""
+
+import inspect
+
 from stoplight.rule import *
 from stoplight.exceptions import *
 from stoplight.decorators import *
+
+_callbacks = set()
+
+
+class ValidationFailureInfo(object):
+    """Describes information related to a particular validation
+    failure."""
+
+    def __init__(self, **kwargs):
+        self._function = kwargs.get("function")
+        self._rule = kwargs.get("rule")
+        self._nested_rule = kwargs.get("nested_rule")
+        self._nested_value = kwargs.get("nested_value")
+        self._param = kwargs.get("parameter")
+        self._param_value = kwargs.get("parameter_value")
+        self._param_value = kwargs.get("ex")
+
+    @property
+    def function(self):
+        """The function whose input was being validated."""
+        return self._function
+
+    @function.setter
+    def function(self, value):
+        self._function = value
+
+    @property
+    def rule(self):
+        """The rule that generated the error."""
+        return self._rule
+
+    @rule.setter
+    def rule(self, value):
+        self._rule = value
+
+    @property
+    def nested_rule(self):
+        """The nested rule that generated the error, if applicable."""
+        return self._nested_rule
+
+    @nested_rule.setter
+    def nested_rule(self, value):
+        self._nested_rule = value
+
+    @property
+    def nested_value(self):
+        """The nested value that generated the error, if applicable"""
+        return self._nested_value
+
+    @nested_value.setter
+    def nested_value(self, value):
+        self._nested_value = value
+
+    @property
+    def parameter(self):
+        """The name of the parameter that failed validation."""
+        return self._param
+
+    @parameter.setter
+    def parameter(self, value):
+        self._param = value
+
+    @property
+    def parameter_value(self):
+        """The value that was passed to the parameter"""
+        return self._param_value
+
+    @parameter_value.setter
+    def parameter_value(self, value):
+        self._param_value = value
+
+    @property
+    def ex(self):
+        """The exception that was thrown by the validation function"""
+        return self._ex
+
+    @ex.setter
+    def ex(self, value):
+        self._ex = value
+
+    def __str__(self):
+        msg = "Validation Failed ["
+        msg += "filename={0}, ".format(
+            inspect.getsourcefile(self.function))
+        msg += "function={0}, ".format(
+            self.function.__name__)
+        msg += "rule={0}, ".format(self.rule.__class__.__name__)
+        msg += "param={0}, ".format(self.parameter)
+        msg += "param_value={0}, ".format(self.parameter_value)
+
+        if self.nested_rule is not None:  # pragma: no cover
+            msg += "nested_rule={0}".format(
+                self.nested_rule.__class__.__name__)
+            msg += "nested_value={0}".format(self.nested_value)
+
+        msg += "ex={0}".format(self.ex)
+        msg += "]"
+
+        return msg
+
+
+def register_callback(callback_func):
+    """This function will register a callback to be called in case
+    a rule fails to validate input.
+
+    This function will be called with information about each failure. The
+    validation callback function should expect a single variable which
+    will be a ValidationFailureInformation object.
+
+    This functionality is intended for and probably most useful for logging.
+    """
+    global _callbacks
+    _callbacks.add(callback_func)
+
+
+def unregister_callback(callback_func):
+    """Unregisters the specified callback function"""
+    if callback_func in _callbacks:
+        _callbacks.remove(callback_func)
+
+
+def failure_dispach(failureinfo):
+    """Sends the specified failure information to all registered callback
+    handlers.
+
+    :param failureinfo: An instance of ValidationFailureInfo describing the
+                        failure
+    """
+    global _callbacks
+
+    for cb in _callbacks:
+        assert isinstance(failureinfo, ValidationFailureInfo)
+
+        try:
+            cb(failureinfo)
+        except Exception as ex:
+            # If a particular callback throws an exception, we do not want
+            # that to prevent subsequent callbacks from happening
+            import sys
+            sys.stderr.write("ERROR: Dispatch function threw an exception.")
+            sys.stderr.write(str(ex))
+            sys.stderr.flush()
