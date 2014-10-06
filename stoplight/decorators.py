@@ -106,7 +106,7 @@ def validate(**rules):
             assert funcparams.args[0] == 'self'
 
             # Validation was successful, call the wrapped function
-            return f(args[0], **outargs)
+            return f(*args, **outargs)
         return wrapper
     return _validate
 
