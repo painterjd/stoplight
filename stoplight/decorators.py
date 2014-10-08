@@ -75,7 +75,7 @@ def validate(**rules):
                             val_failure.nested_value = nested_val
                             val_failure.ex = ex
 
-                            stoplight.failure_dispach(val_failure)
+                            stoplight.failure_dispatch(val_failure)
 
                             return
 
@@ -99,7 +99,7 @@ def validate(**rules):
                     val_failure.rule = rule
                     val_failure.ex = ex
 
-                    stoplight.failure_dispach(val_failure)
+                    stoplight.failure_dispatch(val_failure)
 
                     return
 

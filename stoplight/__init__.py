@@ -151,7 +151,7 @@ def unregister_callback(callback_func):
         _callbacks.remove(callback_func)
 
 
-def failure_dispach(failureinfo):
+def failure_dispatch(failureinfo):
     """Sends the specified failure information to all registered callback
     handlers.
 
