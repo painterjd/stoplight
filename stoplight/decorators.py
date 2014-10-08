@@ -103,7 +103,8 @@ def validate(**rules):
 
                     return
 
-            assert funcparams.args[0] == 'self'
+            # if enforce_class:
+            #    assert funcparams.args[0] == 'self'
 
             # Validation was successful, call the wrapped function
             return f(*args, **kwargs)
