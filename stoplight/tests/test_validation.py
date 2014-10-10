@@ -122,6 +122,19 @@ PositionRuleProgError = HeaderRule(
     "X-Position", is_type(str), lambda: abort(404))
 
 
+def abort_and_raise(msg):
+    raise RuntimeError(msg)
+
+
+FunctionalUppercaseRule = Rule(is_upper(),
+                               lambda: abort_and_raise('not uppercase'))
+
+
+@validate(value=FunctionalUppercaseRule)
+def FunctionValidation(value):
+    return value
+
+
 class DummyEndpoint(object):
 
     # This should throw a ValidationProgrammingError
@@ -208,6 +221,26 @@ class TestValidationDecorator(TestCase):
 
     def setUp(self):
         self.ep = DummyEndpoint()
+
+    def test_function_style_validation(self):
+
+        positive_cases = [
+            'A', 'B', 'C',
+            'AA', 'AB', 'CZ',
+            'RED', 'GREEN', 'BLUE',
+        ]
+        negative_cases = [
+            'z', 'y', 'z',
+            'ww', 'vv', 'uu',
+            'serial', 'cereal', 'surreal'
+        ]
+
+        for case in positive_cases:
+            self.assertEqual(case, FunctionValidation(case))
+
+        for case in negative_cases:
+            with self.assertRaises(RuntimeError):
+                FunctionValidation(case)
 
     def test_programming_error(self):
         with self.assertRaises(ValidationProgrammingError):
