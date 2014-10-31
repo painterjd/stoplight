@@ -10,7 +10,7 @@ REQUIRES = ['six']
 
 setup(
     name='stoplight',
-    version='1.0.1',
+    version='1.1.0',
     description='Input validation framework for Python',
     author='Jamie Painter',
     author_email='jamie.painter@rackspace.com',
