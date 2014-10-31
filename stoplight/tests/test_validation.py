@@ -48,6 +48,16 @@ def abort(code):
     global error_count
     error_count = error_count + 1
 
+detailed_errors = list()
+
+
+def abort_with_details(code, details):
+    global error_count, detailed_errors
+    error_count = error_count + 1
+
+    detailed_errors.append(detailed_errors)
+
+
 other_vals = dict()
 get_other_val = other_vals.get
 
@@ -117,14 +127,18 @@ class BodyRule(Rule):
 
 
 PositionRule = HeaderRule("X-Position", is_type(str)(), lambda: abort(404))
+
+PositionRuleDetailed = HeaderRule("X-Position", is_type(str)(),
+    lambda err: abort_with_details(404, err))
+
 JsonBodyRule = BodyRule(is_json(empty_ok=True), lambda: abort(404))
+
 PositionRuleProgError = HeaderRule(
     "X-Position", is_type(str), lambda: abort(404))
 
 
 def abort_and_raise(msg):
     raise RuntimeError(msg)
-
 
 FunctionalUppercaseRule = Rule(is_upper(),
                                lambda: abort_and_raise('not uppercase'))
@@ -202,6 +216,16 @@ class DummyEndpoint(object):
     def do_something_programming_error(self, request, response, value):
         return value
 
+    # Stoplight allows the user to express rules, alias them,
+    # then clearly know what is being validated.
+    @validate(
+        request=RequestRule(PositionRuleDetailed),
+        response=ResponseRule,
+        value=Rule(is_type(int)(), lambda err: abort_with_details(400, err))
+    )
+    def detailed_error_ep(self, request, response, value):
+        return value
+
 
 class TestValidationFunction(TestCase):
 
@@ -245,6 +269,32 @@ class TestValidationDecorator(TestCase):
     def test_programming_error(self):
         with self.assertRaises(ValidationProgrammingError):
             self.ep.get_value_programming_error('AT_ME')
+
+    def test_detailed_errfuncs(self):
+        global error_count, detailed_errors
+
+        request = DummyRequest()
+        response = DummyResponse()
+
+        # Should succeed
+        oldcount = error_count
+        self.ep.detailed_error_ep(request, response, 1)
+        self.assertEqual(oldcount, error_count)
+
+        # Should Fail Validation
+        detailed_errors = []
+        oldcount = error_count
+        self.ep.detailed_error_ep(request, response, 'blah')
+        self.assertEqual(oldcount + 1, error_count)
+        self.assertEqual(len(detailed_errors), 1)
+
+        # Should Fail Validation
+        detailed_errors = []
+        oldcount = error_count
+        request.headers = {'X-Position': 1}
+        self.ep.detailed_error_ep(request, response, 1)
+        self.assertEqual(oldcount + 1, error_count)
+        self.assertEqual(len(detailed_errors), 1)
 
     def test_callbacks(self):
 

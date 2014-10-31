@@ -64,8 +64,6 @@ def validate(**rules):
                             resp = nested_rule.vfunc(nested_val)  # throws
                         except ValidationFailed as ex:
 
-                            nested_rule.errfunc()
-
                             val_failure = stoplight.ValidationFailureInfo()
                             val_failure.function = f
                             val_failure.parameter = param
@@ -74,6 +72,16 @@ def validate(**rules):
                             val_failure.nested_rule = nested_rule
                             val_failure.nested_value = nested_val
                             val_failure.ex = ex
+
+                            # The error handler can accept no parameters
+                            # or a single parameter that expects to the
+                            # ValidationFailureInfo object
+                            if inspect.getargspec(
+                                    nested_rule.errfunc).args == []:
+
+                                nested_rule.errfunc()
+                            else:
+                                nested_rule.errfunc(val_failure)
 
                             stoplight.failure_dispatch(val_failure)
 
@@ -90,7 +98,6 @@ def validate(**rules):
                         outargs[param] = value
 
                 except ValidationFailed as ex:
-                    rule.errfunc()
 
                     val_failure = stoplight.ValidationFailureInfo()
                     val_failure.function = f
@@ -98,6 +105,11 @@ def validate(**rules):
                     val_failure.parameter_value = value
                     val_failure.rule = rule
                     val_failure.ex = ex
+
+                    if inspect.getargspec(rule.errfunc).args == []:
+                        rule.errfunc()
+                    else:
+                        rule.errfunc(val_failure)
 
                     stoplight.failure_dispatch(val_failure)
 
