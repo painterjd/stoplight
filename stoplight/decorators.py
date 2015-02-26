@@ -126,17 +126,17 @@ def validation_function(func):
     @wraps(func)
     def inner(none_ok=False, empty_ok=False):
         def wrapper(value, **kwargs):
-            if none_ok and value is None:
+            if none_ok is True and value is None:
                 return
 
-            if not none_ok and value is None:
+            if none_ok is not True and value is None:
                 msg = 'None value not permitted'
                 raise ValidationFailed(msg)
 
-            if empty_ok and value == '':
+            if empty_ok is True and value == '':
                 return
 
-            if not empty_ok and value == '':
+            if empty_ok is not True and value == '':
                 msg = 'Empty value not permitted'
                 raise ValidationFailed(msg)
 
