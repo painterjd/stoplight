@@ -3,15 +3,17 @@ stoplight [![Build Status](https://api.travis-ci.org/painterjd/stoplight.png)](h
 
 Stoplight -- An Input Validation Framework for Python
 
-Why Input Validaiton?
-=====================
-Input validation is the most basic, first step to adding security to any application that accepts user input. A lot has been written on the subject, but the gist is to reduce the attack surface of your application by sanitizing all user input so that it meets a very tight set of criteria needed just for the application, and nothing more.
+Why Validate User Input?
+========================
+Input validation is the most basic, first step to adding security to any application that accepts untrusted user input. Volumes have been written on the subject, but the gist is to reduce the attack surface of your application by sanitizing all user input so that it meets a very tight set of criteria needed just for the application, and nothing more. The most common type of attack prevented by input validation is [Code Injection](http://en.wikipedia.org/wiki/Code_injection). 
+
+A great number of user input vulnerabilities (i.e. [Shellshock](http://en.wikipedia.org/wiki/Shellshock_%28software_bug%29)) could be avoided almost entirely if user input were sanitized. 
 
 Example?
 
 Let's say that our application is accepting a US Phone Number only. In that case, our application should only need to accept NNN-NNN-NNNN where N is a digit from 0-9. If the user passes anything else, we can throw it away. 
 
-A great number of user input vulnerabilities (i.e. [Shellshock](http://en.wikipedia.org/wiki/Shellshock_%28software_bug%29)) can be avoided almost entirely if user input were sanitized. 
+
 
 The problem that stoplight aims to address is the intermixing of input validation logic with application logig (in particular with RESTful/REST-like API frameworks). Sometimes they are inseparable, but in almost all cases, they are not. So let's look at the above-mentioned phone number example.
 
@@ -27,7 +29,7 @@ Almost all of today's API frameworks work in a similar manner -- you declare a f
         model.set_phone_number(account_id, phone_number)
         
 
-This is a simple, contrived example. Typicalliy things start getting much more complex. For certain HTTP verbs, a user will want different responses returned. There may be other things to accomplish as well.
+This is a simple, contrived example. Typically things start getting much more complex. For certain HTTP verbs, a user will want different responses returned. There may be other things to accomplish as well.
 
 In Stoplight, we would validate the input like so:
 
