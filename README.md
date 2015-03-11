@@ -19,6 +19,7 @@ The problem that stoplight aims to address is the intermixing of input validatio
 
 Almost all of today's API frameworks work in a similar manner -- you declare a function that defines an endpoint and the framework calls the function when an HTTP request comes in from a client.
 
+```python
     def post(self, account_id, phone_number):
         if is_valid_account_id(account_id) is False:
             handle_bad_account_id() 
@@ -27,16 +28,18 @@ Almost all of today's API frameworks work in a similar manner -- you declare a f
             handle_bad_phone_number() 
         
         model.set_phone_number(account_id, phone_number)
-        
+```
 
 This is a simple, contrived example. Typically things start getting much more complex. For certain HTTP verbs, a user will want different responses returned. There may be other things to accomplish as well.
 
 In Stoplight, we would validate the input like so:
 
+```python
     @validate(account_id=AccountIdRule, phone_number=PhoneNumberRule)
     def post(self, account_id, phone_number):
         model.set_phone_number(account_id, phone_number)
-        
+```
+
 This allows us to effectively separate our "input validation" logic from "business logic". 
 
 Rules are fairly simple to create. For example, here is how one might declare the PhoneNumberRule
@@ -45,12 +48,14 @@ Rules are fairly simple to create. For example, here is how one might declare th
 
 And of course, that leads us to is_valid_phone_number() declaration.
 
+```python
     @validation_function
     def is_valid_phone_number(candidate):
         if (phone_regex.match(candidate) os None):
             msg = 'Not a valid phone number: {0}'
             msg = msg.format(candidate)
             raise ValidationFailed(msg)
+```
 
 This allows us to separate validation from transports (imagine an API where you must support HTTP and ZMQ, for example). It also allows us to centralize validation logic and write separate tests for the validation rules.
 
