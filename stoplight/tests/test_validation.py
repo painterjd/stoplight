@@ -1,5 +1,6 @@
 from unittest import TestCase
 
+import threading
 import stoplight
 from stoplight import *
 from stoplight.exceptions import *
@@ -7,6 +8,7 @@ from stoplight.exceptions import *
 import os
 
 VALIDATED_STR = 'validated'
+globalctx = threading.local()
 
 
 @validation_function
@@ -104,26 +106,86 @@ class RequestRule(Rule):
         :param nested_rules: Any sub rules that also should be
           used for validation
         """
+        def _onerror():
+            return abort(500)
+
         # If we get something that's not a request here,
         # something bad happened in the server (i.e.
         # maybe a programming error), so return a 500
         Rule.__init__(self, vfunc=is_request(),
-                      errfunc=lambda: abort(500),
+                      errfunc=_onerror,
                       nested_rules=list(nested_rules))
+
+
+class Matryoshka(object):
+
+    def __init__(self, name, inner=None):
+
+        """Constructs a new Matryoshka
+
+        :param name: The name of this Matryoshka
+        :param inner: The Matryoshka contained therein
+        """
+        self._name = name
+        self._inner = inner
+
+    @property
+    def inner(self):
+        return self._inner
+
+    @property
+    def name(self):
+        return self._name
+
+
+# Example showing how to use a closure and a validation
+# function simultaneously.
+def has_name(name):
+    @validation_function
+    def _inner(obj):
+        if name != obj.name:
+            msg = "Name '{0}' does not match '{1}"
+            msg = msg.format(obj.name, name)
+            raise ValidationFailed(msg)
+
+    return _inner
+
+
+class MatryoshkaRule(Rule):
+    def __init__(self, name, *nested_rules, **kwargs):
+        """Constructs a new Matryoshka rule"""
+        self.matryoshka_name = name
+
+        outer = kwargs.get("outer")
+        getter = kwargs.get("getter")
+
+        def _onerror():
+            return abort(500)
+
+        def _getter(matryoshka):
+            return matryoshka.inner
+
+        Rule.__init__(self, vfunc=has_name(name)(),
+            getter=getter if outer else _getter,
+            errfunc=_onerror, nested_rules=list(nested_rules))
 
 
 class HeaderRule(Rule):
 
     def __init__(self, headername, vfunc, errfunc):
-        getter = lambda r: r.headers.get(headername)
+        def getter(req):
+            return req.headers.get(headername)
+
         Rule.__init__(self, vfunc=vfunc, getter=getter, errfunc=errfunc)
 
 
 class BodyRule(Rule):
 
     def __init__(self, vfunc, errfunc):
-        getter = lambda req: req.body
-        Rule.__init__(self, vfunc=vfunc, getter=getter, errfunc=errfunc)
+        def _getter(req):
+            return req.body
+
+        Rule.__init__(self, vfunc=vfunc, getter=_getter, errfunc=errfunc)
 
 
 PositionRule = HeaderRule("X-Position", is_type(str)(), lambda: abort(404))
@@ -172,15 +234,6 @@ class DummyEndpoint(object):
     def get_value_happy_path(self, value1, value2, value3):
         return value1 + value2 + value3
 
-    @validate(
-        value1=Rule(is_upper(), lambda: abort(404)),
-        value2=Rule(is_upper(empty_ok=True), lambda: abort(404),
-                    get_other_val),
-    )  # pragma: no cover
-    def get_value_with_getter(self, value1):
-        global other_vals
-        return value1 + other_vals.get('value2')
-
     # Falcon-style endpoint
     @validate(
         request=Rule(is_request(), lambda: abort(404)),
@@ -226,6 +279,36 @@ class DummyEndpoint(object):
     def detailed_error_ep(self, request, response, value):
         return value
 
+    # Validation function with only global-scopped validations
+    @validate(Rule(is_upper(), lambda err: abort_with_details(400, err),
+        lambda z: globalctx.testvalue))
+    def do_something_global(self):
+        return globalctx.testvalue
+
+    @validate(Rule(is_upper(), lambda err: abort_with_details(400, err)))
+    def free_rule_no_getter(self):
+        return
+
+    # Test nested rules
+    @validate(param=MatryoshkaRule("large",
+        MatryoshkaRule("med", MatryoshkaRule("small")),
+        outer=True)
+    )
+    def nested_rules(self, param):
+        return param.name
+
+    # Demonstrates a programming error. Every parameter but 'self' must
+    # be validated.
+    @validate(param1=UppercaseRule)
+    def missing_parameters(self, param1, param2):
+        return param1 + param2
+
+    # Demonstrates passing a rule for a parameter that doesn't actually
+    # exist
+    @validate(param1=UppercaseRule, param2=UppercaseRule, param3=UppercaseRule)
+    def superfluous_parameter(self, param1, param2):
+        return param1 + param2
+
 
 class TestValidationFunction(TestCase):
 
@@ -245,6 +328,14 @@ class TestValidationDecorator(TestCase):
 
     def setUp(self):
         self.ep = DummyEndpoint()
+
+    def test_missing_parameters(self):
+        with self.assertRaises(ValidationProgrammingError):
+            self.ep.missing_parameters('value1', 'value2')
+
+    def test_superfluous_parameter(self):
+        with self.assertRaises(ValidationProgrammingError):
+            self.ep.superfluous_parameter('value1', 'value2')
 
     def test_function_style_validation(self):
 
@@ -266,6 +357,24 @@ class TestValidationDecorator(TestCase):
             with self.assertRaises(RuntimeError):
                 FunctionValidation(case)
 
+    def test_nested_rules(self):
+        global error_count
+
+        matryoshka_small = Matryoshka("small")
+        matryoshka_med = Matryoshka("med", matryoshka_small)
+        matryoshka_large = Matryoshka("large", matryoshka_med)
+
+        # This should succeed!
+        oldcount = error_count
+        out = self.ep.nested_rules(matryoshka_large)
+        self.assertEqual(oldcount, error_count)
+        self.assertEqual(matryoshka_large.name, out)
+
+        # This should fail
+        oldcount = error_count
+        self.ep.nested_rules(matryoshka_small)
+        self.assertEqual(oldcount + 1, error_count)
+
     def test_programming_error(self):
         with self.assertRaises(ValidationProgrammingError):
             self.ep.get_value_programming_error('AT_ME')
@@ -276,6 +385,7 @@ class TestValidationDecorator(TestCase):
         request = DummyRequest()
         response = DummyResponse()
 
+        """
         # Should succeed
         oldcount = error_count
         self.ep.detailed_error_ep(request, response, 1)
@@ -287,6 +397,7 @@ class TestValidationDecorator(TestCase):
         self.ep.detailed_error_ep(request, response, 'blah')
         self.assertEqual(oldcount + 1, error_count)
         self.assertEqual(len(detailed_errors), 1)
+        """
 
         # Should Fail Validation
         detailed_errors = []
@@ -297,7 +408,6 @@ class TestValidationDecorator(TestCase):
         self.assertEqual(len(detailed_errors), 1)
 
     def test_callbacks(self):
-
         global error_count
 
         request = DummyRequest()
@@ -306,7 +416,6 @@ class TestValidationDecorator(TestCase):
         # Let's register a bad callback that throws. This is to ensure
         # that doing so would not prevent other callbacks from
         # happening
-
         def bad_cb(x):
             raise Exception("Bad callback")
 
@@ -327,7 +436,8 @@ class TestValidationDecorator(TestCase):
         # have resulted no change to response_obj
         self.assertEqual(len(valfailures), 0)
 
-        cb = lambda x: valfailures.append(x)
+        def cb(x):
+            valfailures.append(x)
 
         # Now register a callback and try again
         stoplight.register_callback(cb)
@@ -361,8 +471,8 @@ class TestValidationDecorator(TestCase):
         self.assertIsInstance(obj.parameter_value, DummyRequest)
 
         # nested level stuff
-        self.assertIsInstance(obj.nested_rule, HeaderRule)
-        self.assertEqual(obj.nested_value, 9876)
+        self.assertIsInstance(obj.nested_failure.rule, HeaderRule)
+        self.assertEqual(obj.nested_failure.parameter_value, 9876)
 
         # This is the exception that should have been thrown
         self.assertIsInstance(obj.ex, ValidationFailed)
@@ -373,7 +483,7 @@ class TestValidationDecorator(TestCase):
         self.assertIn('RequestRule', pretty)
         self.assertIn(obj.function.__name__, pretty)
         self.assertIn(obj.parameter, pretty)
-        self.assertIn(str(obj.nested_value), pretty)
+        self.assertIn(str(obj.nested_failure), pretty)
         self.assertIn(str(obj.ex), pretty)
 
     def test_falcon_style(self):
@@ -385,9 +495,8 @@ class TestValidationDecorator(TestCase):
 
         # Try to call with missing params. The validation
         # function should never get called
-        oldcount = error_count
-        self.ep.get_falcon_style(response, 'HELLO')
-        self.assertEqual(oldcount + 1, error_count)
+        with self.assertRaises(ValidationProgrammingError) as ctx:
+            self.ep.get_falcon_style(response, 'HELLO')
 
         # Try to pass a string to a positional argument
         # where a response is expected
@@ -395,7 +504,7 @@ class TestValidationDecorator(TestCase):
         self.ep.get_falcon_style(request, "bogusinput", 'HELLO')
         self.assertEqual(oldcount + 1, error_count)
 
-        # Pass in as kwvalues with good input but out of
+        # Pass in as kwargs with good input but out of
         # typical order (should succeed)
         oldcount = error_count
         self.ep.get_falcon_style(response=response, value='HELLO',
@@ -468,9 +577,8 @@ class TestValidationDecorator(TestCase):
 
         # Try to call with missing params. The validation
         # function should never get called
-        oldcount = error_count
-        self.ep.get_falcon_style2(response, 'HELLO')
-        self.assertEqual(oldcount + 1, error_count)
+        with self.assertRaises(ValidationProgrammingError) as ctx:
+            self.ep.get_falcon_style2(response, 'HELLO')
 
         # Try to pass a string to a positional argument
         # where a response is expected
@@ -523,19 +631,19 @@ class TestValidationDecorator(TestCase):
         res = self.ep.get_value_happy_path(None, 'HELLO', 'YES')
         self.assertEqual(oldcount + 1, error_count)
 
-    def test_getter(self):
-        global other_vals
+    def test_global_ctx(self):
+        global globalctx
+        global error_count
 
-        other_vals['value2'] = 'HELLO'
+        globalctx.testvalue = "SOMETHING"  # Should succeed
+        res = self.ep.do_something_global()
+        self.assertEqual(globalctx.testvalue, "SOMETHING")
 
-        # Now have our validation actually try to
-        # get those values
+        oldcount = error_count
+        globalctx.testvalue = "Something"  # Should succeed
+        res = self.ep.do_something_global()
+        self.assertEqual(oldcount + 1, error_count)
 
-        # This should succeed
-        res = self.ep.get_value_with_getter('TEST')
-        self.assertEqual('TESTHELLO', res)
-
-        # check empty_ok
-        other_vals['value2'] = ''
-        res = self.ep.get_value_with_getter('TEST')
-        self.assertEqual('TEST', res)
+    def test_free_rule_no_getter(self):
+        with self.assertRaises(ValidationProgrammingError):
+            res = self.ep.free_rule_no_getter()

@@ -41,8 +41,7 @@ class ValidationFailureInfo(object):
     def __init__(self, **kwargs):
         self._function = kwargs.get("function")
         self._rule = kwargs.get("rule")
-        self._nested_rule = kwargs.get("nested_rule")
-        self._nested_value = kwargs.get("nested_value")
+        self._nested_failure = kwargs.get("nested_failure")
         self._param = kwargs.get("parameter")
         self._param_value = kwargs.get("parameter_value")
         self._param_value = kwargs.get("ex")
@@ -66,22 +65,12 @@ class ValidationFailureInfo(object):
         self._rule = value
 
     @property
-    def nested_rule(self):
-        """The nested rule that generated the error, if applicable."""
-        return self._nested_rule
+    def nested_failure(self):
+        return self._nested_failure
 
-    @nested_rule.setter
-    def nested_rule(self, value):
-        self._nested_rule = value
-
-    @property
-    def nested_value(self):
-        """The nested value that generated the error, if applicable"""
-        return self._nested_value
-
-    @nested_value.setter
-    def nested_value(self, value):
-        self._nested_value = value
+    @nested_failure.setter
+    def nested_failure(self, value):
+        self._nested_failure = value
 
     @property
     def parameter(self):
@@ -120,10 +109,8 @@ class ValidationFailureInfo(object):
         msg += "param={0}, ".format(self.parameter)
         msg += "param_value={0}, ".format(self.parameter_value)
 
-        if self.nested_rule is not None:  # pragma: no cover
-            msg += "nested_rule={0}".format(
-                self.nested_rule.__class__.__name__)
-            msg += "nested_value={0}".format(self.nested_value)
+        if self.nested_failure is not None:  # pragma: no cover
+            msg += "nested_failure={0}".format(self.nested_failure)
 
         msg += "ex={0}".format(self.ex)
         msg += "]"
@@ -167,7 +154,8 @@ def failure_dispatch(failureinfo):
             cb(failureinfo)
         except Exception as ex:
             # If a particular callback throws an exception, we do not want
-            # that to prevent subsequent callbacks from happening
+            # that to prevent subsequent callbacks from happening, so we
+            # catch and squash this error and write it to stderr
             import sys
             sys.stderr.write("ERROR: Dispatch function threw an exception.")
             sys.stderr.write(str(ex))
