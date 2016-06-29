@@ -19,10 +19,10 @@ Almost all of today's API frameworks work in a similar manner -- you declare a f
 
 ```python
 def post(self, account_id, phone_number):
-    if is_valid_account_id(account_id) is False:
+    if not is_valid_account_id(account_id):
         handle_bad_account_id() 
         
-    if is_valid_phone_number(phone_number) is False:
+    if not is_valid_phone_number(phone_number):
         handle_bad_phone_number() 
     
     model.set_phone_number(account_id, phone_number)
@@ -51,7 +51,7 @@ And of course, that leads us to is_valid_phone_number() declaration.
 ```python
 @validation_function
 def is_valid_phone_number(candidate):
-    if (phone_regex.match(candidate) os None):
+    if (phone_regex.match(candidate) is None):
         msg = 'Not a valid phone number: {0}'
         msg = msg.format(candidate)
         raise ValidationFailed(msg)
