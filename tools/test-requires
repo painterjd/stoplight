@@ -1,5 +1,6 @@
 coverage
-six
+mock
 nose
-testtools
 pep8
+six
+testtools
