@@ -1,5 +1,6 @@
 coverage
 six
-nose
+pytest-cov==2.5.1
+pytest==3.3.2
 testtools
-pep8
+pycodestyle
