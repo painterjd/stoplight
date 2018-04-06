@@ -1,6 +1,7 @@
-coverage
-six
+coverage==4.4.1
+mock==2.0
+six==1.11.0
 pytest-cov==2.5.1
 pytest==3.3.2
-testtools
-pycodestyle
+testtools==2.3.0
+pycodestyle==2.3.1
