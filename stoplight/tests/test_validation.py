@@ -47,12 +47,14 @@ def is_type(t):
             raise ValidationFailed('Input is incorrect type')
     return func
 
+
 error_count = 0
 
 
 def abort(code):
     global error_count
     error_count = error_count + 1
+
 
 detailed_errors = list()
 
@@ -206,6 +208,7 @@ PositionRuleProgError = HeaderRule(
 def abort_and_raise(msg):
     raise RuntimeError(msg)
 
+
 FunctionalUppercaseRule = Rule(is_upper(),
                                lambda: abort_and_raise('not uppercase'))
 
@@ -352,7 +355,7 @@ class TestValidationDecorator(TestCase):
             'z', 'y', 'z',
             'ww', 'vv', 'uu',
             'serial', 'cereal', 'surreal',
-            '\}', '\{'
+            '}', '{', '\\}', '\\{', r'\{', r'\}'
         ]
 
         for case in positive_cases:
