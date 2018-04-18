@@ -1,14 +1,18 @@
+import os
+import re
+import threading
 from unittest import TestCase
 
-import threading
+import mock
+
 import stoplight
 from stoplight import *
 from stoplight.exceptions import *
 
-import os
-
 VALIDATED_STR = 'validated'
 globalctx = threading.local()
+
+IS_UPPER_REGEX = re.compile('^[A-Z]*$')
 
 
 @validation_function
@@ -16,7 +20,7 @@ def is_upper(z):
     """Simple validation function for testing purposes
     that ensures that input is all caps
     """
-    if z.upper() != z:
+    if not IS_UPPER_REGEX.match(z):
         raise ValidationFailed('{0} is not uppercase'.format(z))
 
 
@@ -350,7 +354,8 @@ class TestValidationDecorator(TestCase):
         negative_cases = [
             'z', 'y', 'z',
             'ww', 'vv', 'uu',
-            'serial', 'cereal', 'surreal'
+            'serial', 'cereal', 'surreal',
+            '}', '{', '\\}', '\\{', r'\{', r'\}'
         ]
 
         for case in positive_cases:
@@ -650,3 +655,13 @@ class TestValidationDecorator(TestCase):
     def test_free_rule_no_getter(self):
         with self.assertRaises(ValidationProgrammingError):
             res = self.ep.free_rule_no_getter()
+
+    def test_validation_failure_deprecation_warning(self):
+        with mock.patch('warnings.warn') as mock_warning:
+            ValidationFailed('hello {0}', 'world')
+            self.assertEqual(mock_warning.call_count, 1)
+
+    def test_validation_programmering_error_deprecation_warning(self):
+        with mock.patch('warnings.warn') as mock_warning:
+            ValidationProgrammingError('hello {0}', 'world')
+            self.assertEqual(mock_warning.call_count, 1)
