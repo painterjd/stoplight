@@ -26,5 +26,4 @@ class ValidationProgrammingError(ValueError):
                 DeprecationWarning
             )
             msg = msg.format(*args, **kwargs)
-            msg = msg.format(*args, **kwargs)
         super(ValidationProgrammingError, self).__init__(msg)
