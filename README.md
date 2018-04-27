@@ -13,7 +13,7 @@ Example
 -------
 Let's say that our application is accepting a US Phone Number only. In that case, our application should only need to accept NNN-NNN-NNNN where N is a digit from 0-9. If the user passes anything else, we can throw it away. 
 
-The problem that stoplight aims to address is the intermixing of input validation logic with application logig (in particular with RESTful/REST-like API frameworks). Sometimes they are inseparable, but in almost all cases, they are not. So let's look at the above-mentioned phone number example.
+The problem that stoplight aims to address is the intermixing of input validation logic with application logic (in particular with RESTful/REST-like API frameworks). Sometimes they are inseparable, but in almost all cases, they are not. So let's look at the above-mentioned phone number example.
 
 Almost all of today's API frameworks work in a similar manner -- you declare a function that defines an endpoint and the framework calls the function when an HTTP request comes in from a client.
 
