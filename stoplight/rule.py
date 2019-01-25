@@ -44,7 +44,12 @@ class Rule(object):
         passing the failure_info parameter to the error handler
         if it expects a parameter"""
 
-        if inspect.getargspec(self.errfunc).args == []:
+        try:
+            spec = inspect.getfullargspec(self.errfunc)
+        except AttributeError:
+            # running on Python 2
+            spec = inspect.getargspec(self.errfunc)
+        if spec.args == []:
             self.errfunc()
         else:
             self.errfunc(failure_info)
