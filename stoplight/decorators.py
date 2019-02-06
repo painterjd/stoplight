@@ -98,7 +98,11 @@ def validate(*freerules, **paramrules):
                 if _apply_rule(f, rule, None, rule.getter) is not None:
                     return
 
-            funcparams = inspect.getargspec(f)
+            try:
+                funcparams = inspect.getfullargspec(f)
+            except AttributeError:
+                # running on Python 2
+                funcparams = inspect.getargspec(f)
 
             # Holds the list of validated values. Only
             # these values are passed to the decorated function
