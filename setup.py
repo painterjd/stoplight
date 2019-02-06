@@ -33,7 +33,7 @@ setup(
     test_suite='stoplight',
     zip_safe=False,
     include_package_data=True,
-    packages=find_packages(exclude=['ez_setup', 'stoplight/tests' ]),
+    packages=find_packages(exclude=['ez_setup', 'stoplight/tests']),
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
