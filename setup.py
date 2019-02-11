@@ -27,11 +27,13 @@ setup(
     },
     author='Jamie Painter',
     author_email='jamie.painter@rackspace.com',
+    maintainer='Benjamen Meyer',
+    maintainer_email='bm_witness@yahoo.com',
     install_requires=REQUIRES,
     test_suite='stoplight',
     zip_safe=False,
     include_package_data=True,
-    packages=find_packages(exclude=['ez_setup']),
+    packages=find_packages(exclude=['ez_setup', 'stoplight/tests']),
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
@@ -43,6 +45,7 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Security'
     ]
