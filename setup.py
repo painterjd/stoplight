@@ -13,7 +13,7 @@ with open('README.md') as description_input:
 
 setup(
     name='stoplight',
-    version='1.4.0',
+    version='1.4.1',
     description='Input validation framework for Python',
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/x-md',
