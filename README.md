@@ -1,4 +1,4 @@
-Stoplight
+Stoplight [![Build](https://github.com/painterjd/stoplight/actions/workflows/python-package.yml/badge.svg)](https://github.com/painterjd/stoplight/actions/workflows/python-package.yml)
 =========
 
 Stoplight -- An Input Validation Framework for Python
